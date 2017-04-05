@@ -9,24 +9,26 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 # constants
-L = 5.0 # length of domain [-L/2, L/2]
-T = 5.0 # total time 
+L = 1.0 # length of domain [-L/2, L/2]
+T = 1.0 # total time
+
 nx = 100 # spatial grid size
 nt = 100 # time grid size
 
-x = np.linspace(-L/2,L/2,nx) # spatial grid
+x = np.linspace(-L/2,L/2,nx) # spatial gri
+t = np.linspace(0,T,nt) # time grid
 
-dx = L / nx # space step size
-dt = T / nt # time step size
+dx = x[1] - x[0] # space step size
+dt = t[1] - t[0] # time step size
 
-a = (dt/dx**2) * 1.0j # 
+a = (dt/dx**2)*1.0j # 
 
 # potential function
 def V(x):
 	#U = 0 	# free particle
-	#U = harmonic(x)
-	#U = well(x)
-	U = triangle(x)
+	U = harmonic(x)
+	#U = well(x,h=1)
+	#U = triangle(x)
 	return U
 
 # harmonic potential
@@ -36,7 +38,7 @@ def harmonic(x):
 # potential well
 # args: position x, left bound of well l, right bound of well r, height h
 # default height is infinite well
-def well(x,l=-0.2*L,r=0.2*L,h=10000):
+def well(x,l=-0.1*L,r=0.1*L,h=10000):
 	if x < l or x > r:
 		U = h
 	else:
@@ -61,10 +63,11 @@ def diagonal(i,x):
 	return 1 - 2*a + a*(dx**2)*V(x[i])
 
 # constructs Hamiltonian matrix
-def constructH(x,nx,nt,a):
+def constructH(x,nx,nt):
 	off = a*np.ones((nx-1,),dtype=complex)
 	dia = np.asarray([diagonal(i,x) for i in range(nx)])
-	H = np.diag(dia) + np.diag(off,k=1) + np.diag(off,k=-1)    
+	H = np.diag(dia) + np.diag(off,k=1) + np.diag(off,k=-1)
+	
 	return H
 
 # initializes psi with initial condition
@@ -73,27 +76,29 @@ def constructH(x,nx,nt,a):
 def initPsi(nx,nt,x,k,sig):
 	psi = np.zeros([nt,nx],dtype=complex)
 	psi[0,:] = packet(x,k,sig)
+
 	return psi
 
 def packet(x,k,sig):
-	return np.exp(-x**2/(4*sig**2) + k*x*1.0j)
+	return np.exp(-(x-0.1*L)**2/(4*sig**2) + k*x*1.0j)
 
-def BTCS(x,nx,nt,a,k,sig):
+# Backward-Time Centered-Space finite difference scheme
+def BTCS(x,nx,nt,k,sig):
 
-	H = constructH(x,nx,nt,a)
+	H = constructH(x,nx,nt)
 	psi = initPsi(nx,nt,x,k,sig)
 
 	for n in range(nt-1):
 		psi[n+1,:] = np.linalg.solve(H,psi[n,:])
-		psi[n+1,0] = 0
-		psi[n+1,-1] = 0 
+		#psi[n+1,0] = psi[n+1,-1]
+		psi[n+1,-1] = 0.5*(psi[n+1,1] + psi[n+1,-2]) 
 
 	return psi
 
-k = 1
-sig = 0.3
+k = 1 # wave number
+sig = 0.08 # width of wave packet
 
-psi = BTCS(x,nx,nt,a,k,sig)
+psi = BTCS(x,nx,nt,k,sig)
 U = np.asarray([V(x[i]) for i in range(nx)])
 
 plt.plot(x,np.absolute(psi[0,:]),color='k',label='Absolute Value')
@@ -101,26 +106,18 @@ plt.plot(x,np.real(psi[0,:]),color='b',label='Real Part')
 plt.plot(x,np.imag(psi[0,:]),color='r',label='Imaginary Part')
 plt.plot(x,U,color='0.8',label='Potential')
 plt.xlim([-L/2,L/2])
+plt.ylim([np.min(np.real(psi)),np.max(np.real(psi))])
 plt.title("Initial Condition")
 plt.legend()
-plt.show()
 
-"""      
-time = 80
-plt.plot(x,np.absolute(psi[time,:]),color='k',label='Absolute Value')
-plt.plot(x,np.real(psi[time,:]),color='b',label='Real Part')
-plt.plot(x,np.imag(psi[time,:]),color='r',label='Imaginary Part')
-plt.xlim([-L/2,L/2])
-plt.title("Solution at t="+str(T*time/nt))
-plt.show()
-"""
 
 fig = plt.figure()
-ax = plt.axes(xlim=(-L/2,L/2),ylim=(-1,1))
-real, = ax.plot([],[],lw=2,color='b')
-imag, = ax.plot([],[],lw=2,color='r')
-abso, = ax.plot([],[],lw=2,color='k')
-potent = ax.plot(x,U,color='0.6')
+ax = plt.axes(xlim=(-L/2,L/2),ylim=(np.min(np.real(psi)),np.max(np.real(psi))))
+real, = ax.plot([],[],lw=2,color='b',label='Real Part')
+imag, = ax.plot([],[],lw=2,color='r',label='Imaginary Part')
+abso, = ax.plot([],[],lw=2,color='k',label='Absolute Value')
+potent = ax.plot(x,U,color='0.6',label='V(x)')
+plt.legend()
 
 anim = animation.FuncAnimation(fig,animate,frames=psi,interval=100)
 plt.show()
