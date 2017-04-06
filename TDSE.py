@@ -5,6 +5,7 @@
 import numpy as np
 import scipy as sp
 from scipy import linalg
+from scipy import sparse
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
@@ -12,7 +13,7 @@ from matplotlib import animation
 L = 1.0 # length of domain [-L/2, L/2]
 T = 1.0 # total time
 
-nx = 100 # spatial grid size
+nx = 200 # spatial grid size
 nt = 100 # time grid size
 
 x = np.linspace(-L/2,L/2,nx) # spatial gri
@@ -25,8 +26,8 @@ a = (dt/dx**2)*1.0j #
 
 # potential function
 def V(x):
-	#U = 0 	# free particle
-	U = harmonic(x)
+	U = 0 	# free particle
+	#U = harmonic(x)
 	#U = well(x,h=1)
 	#U = triangle(x)
 	return U
@@ -68,37 +69,51 @@ def constructH(x,nx,nt):
 	dia = np.asarray([diagonal(i,x) for i in range(nx)])
 	H = np.diag(dia) + np.diag(off,k=1) + np.diag(off,k=-1)
 	
+	H[-1,0] = a # periodic boundary condition
+	H[0,-1] = a
+
+	return H
+
+# constructs Hamiltonian matrix
+def constructHSparse(x,nx,nt):
+	off = a*np.ones((nx-1,),dtype=complex)
+	dia = np.asarray([diagonal(i,x) for i in range(nx)])
+	H = np.diag(dia) + np.diag(off,k=1) + np.diag(off,k=-1)
+	
+	H[-1,0] = a # periodic boundary condition
+	H[0,-1] = a
+
 	return H
 
 # initializes psi with initial condition
 # and zeros for the rest 
 # row n is solution on whole domain at time n
-def initPsi(nx,nt,x,k,sig):
+def initPsi(nx,nt,x,A,k,sig):
 	psi = np.zeros([nt,nx],dtype=complex)
-	psi[0,:] = packet(x,k,sig)
+	psi[0,:] = packet(x,A,k,sig)
 
 	return psi
 
-def packet(x,k,sig):
-	return np.exp(-(x-0.1*L)**2/(4*sig**2) + k*x*1.0j)
+def packet(x,A,k,sig):
+	return A*np.exp(-(x)**2/(4*sig**2) + k*x*1.0j)
 
 # Backward-Time Centered-Space finite difference scheme
-def BTCS(x,nx,nt,k,sig):
+def BTCS(x,nx,nt,A,k,sig):
 
 	H = constructH(x,nx,nt)
-	psi = initPsi(nx,nt,x,k,sig)
+	psi = initPsi(nx,nt,x,k,sig,A)
 
 	for n in range(nt-1):
 		psi[n+1,:] = np.linalg.solve(H,psi[n,:])
-		#psi[n+1,0] = psi[n+1,-1]
 		psi[n+1,-1] = 0.5*(psi[n+1,1] + psi[n+1,-2]) 
 
 	return psi
 
+A = 0.1 # amplitude
 k = 1 # wave number
-sig = 0.08 # width of wave packet
+sig = 0.05 # width of wave packet
 
-psi = BTCS(x,nx,nt,k,sig)
+psi = BTCS(x,nx,nt,A,k,sig)
 U = np.asarray([V(x[i]) for i in range(nx)])
 
 plt.plot(x,np.absolute(psi[0,:]),color='k',label='Absolute Value')
@@ -112,7 +127,7 @@ plt.legend()
 
 
 fig = plt.figure()
-ax = plt.axes(xlim=(-L/2,L/2),ylim=(np.min(np.real(psi)),np.max(np.real(psi))))
+ax = plt.axes(xlim=(-L/2,L/2),ylim=(-1,1))
 real, = ax.plot([],[],lw=2,color='b',label='Real Part')
 imag, = ax.plot([],[],lw=2,color='r',label='Imaginary Part')
 abso, = ax.plot([],[],lw=2,color='k',label='Absolute Value')
