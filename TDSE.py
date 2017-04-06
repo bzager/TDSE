@@ -5,9 +5,11 @@
 import numpy as np
 import scipy as sp
 from scipy import linalg
-from scipy import sparse
+from scipy.sparse import csc_matrix,linalg
 import matplotlib.pyplot as plt
 from matplotlib import animation
+
+import time
 
 # constants
 L = 1.0 # length of domain [-L/2, L/2]
@@ -26,9 +28,9 @@ a = (dt/dx**2)*1.0j #
 
 # potential function
 def V(x):
-	U = 0 	# free particle
+	#U = 0 	# free particle
 	#U = harmonic(x)
-	#U = well(x,h=1)
+	U = well(x)
 	#U = triangle(x)
 	return U
 
@@ -39,7 +41,7 @@ def harmonic(x):
 # potential well
 # args: position x, left bound of well l, right bound of well r, height h
 # default height is infinite well
-def well(x,l=-0.1*L,r=0.1*L,h=10000):
+def well(x,l=-0.2*L,r=0.2*L,h=10000):
 	if x < l or x > r:
 		U = h
 	else:
@@ -74,16 +76,9 @@ def constructH(x,nx,nt):
 
 	return H
 
-# constructs Hamiltonian matrix
-def constructHSparse(x,nx,nt):
-	off = a*np.ones((nx-1,),dtype=complex)
-	dia = np.asarray([diagonal(i,x) for i in range(nx)])
-	H = np.diag(dia) + np.diag(off,k=1) + np.diag(off,k=-1)
-	
-	H[-1,0] = a # periodic boundary condition
-	H[0,-1] = a
-
-	return H
+# turns a matrix into a sparse matrix
+def sparsify(A):
+	return csc_matrix(A)
 
 # initializes psi with initial condition
 # and zeros for the rest 
@@ -101,32 +96,40 @@ def packet(x,A,k,sig):
 def BTCS(x,nx,nt,A,k,sig):
 
 	H = constructH(x,nx,nt)
-	psi = initPsi(nx,nt,x,k,sig,A)
+	H = sparsify(H)
+	psi = initPsi(nx,nt,x,A,k,sig)
+
+	#times.append(time.time())
 
 	for n in range(nt-1):
-		psi[n+1,:] = np.linalg.solve(H,psi[n,:])
-		psi[n+1,-1] = 0.5*(psi[n+1,1] + psi[n+1,-2]) 
+		#psi[n+1,:] = np.linalg.solve(H,psi[n,:]) # non sparse solver
+		psi[n+1,:] = linalg.spsolve(H,psi[n,:]) # sparse solver
+		psi[n+1,-1] = 0.5*(psi[n+1,1] + psi[n+1,-2])
+
+	#times.append(time.time())
 
 	return psi
 
-A = 0.1 # amplitude
-k = 1 # wave number
-sig = 0.05 # width of wave packet
+A = 0.5 # amplitude
+k = 2 # wave number
+sig = 0.02 # width of wave packet
 
+times = []
 psi = BTCS(x,nx,nt,A,k,sig)
+
 U = np.asarray([V(x[i]) for i in range(nx)])
 
+fig = plt.figure(1)
 plt.plot(x,np.absolute(psi[0,:]),color='k',label='Absolute Value')
 plt.plot(x,np.real(psi[0,:]),color='b',label='Real Part')
 plt.plot(x,np.imag(psi[0,:]),color='r',label='Imaginary Part')
 plt.plot(x,U,color='0.8',label='Potential')
 plt.xlim([-L/2,L/2])
-plt.ylim([np.min(np.real(psi)),np.max(np.real(psi))])
+plt.ylim(-1,1)
 plt.title("Initial Condition")
 plt.legend()
 
-
-fig = plt.figure()
+fig = plt.figure(2)
 ax = plt.axes(xlim=(-L/2,L/2),ylim=(-1,1))
 real, = ax.plot([],[],lw=2,color='b',label='Real Part')
 imag, = ax.plot([],[],lw=2,color='r',label='Imaginary Part')
@@ -135,5 +138,10 @@ potent = ax.plot(x,U,color='0.6',label='V(x)')
 plt.legend()
 
 anim = animation.FuncAnimation(fig,animate,frames=psi,interval=100)
+
+#times.append(time.time())
+#timeDif = np.diff(times)
+#print(timeDif)
+
 plt.show()
 
