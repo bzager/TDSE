@@ -21,20 +21,20 @@ L = 100.0 # length of domain [-L/2, L/2]
 plotL = L/2
 T = 10 # total time
 
-##nx = 1000 # spatial grid size
-##nt = 1000 # time grid size
-dx = 0.01
-dt = 0.01
+nx = 1000 # spatial grid size
+nt = 1000 # time grid size
+##dx = 0.01
+##dt = 0.01
 
 
-x = np.arange(-L/2,L/2,dx) # spatial grid
-t = np.arange(0,T,dt) # time grid
+x = np.linspace(-L/2,L/2,nx) # spatial grid
+t = np.linspace(0,T,nt) # time grid
 
-nx = x.shape[0]
-nt = t.shape[0]
-##
-##dx = x[1] - x[0] # space step size
-##dt = t[1] - t[0] # time step size
+##nx = x.shape[0]
+##nt = t.shape[0]
+
+dx = x[1] - x[0] # space step size
+dt = t[1] - t[0] # time step size
 
 a = 1/(2*dx**2) # 
 
@@ -101,15 +101,15 @@ def sparsify(M):
 # initializes psi with initial condition
 # and zeros for the rest 
 # row n is solution on whole domain at time n
-def initPsi(x,x0,A,p0,sig):
+def initPsi(x,x0,A,k0,sig):
         psi = np.zeros([nt,nx],dtype=np.complex)
-        psi[0] = packet(x,x0,A,p0,sig)
+        psi[0] = packet(x,x0,A,k0,sig)
 
         return psi
 
-def packet(x,x0,A,p0,sig):
-        return A*np.exp(-(x-x0)**2/(2*sig**2) - p0*x*1j)
-##      return A*np.exp(p0*(x-x0)*1j)*np.exp(-(x-x0)**2/(4*sig**2))
+def packet(x,x0,A,k0,sig):
+        return A*np.exp(-(x-x0)**2/(2*sig**2) - k0*x*1j)
+##      return A*np.exp(k0*(x-x0)*1j)*np.exp(-(x-x0)**2/(4*sig**2))
 
 def BTCS(A,B,psi):
         for n in range(nt-1):
@@ -223,10 +223,10 @@ def animatePsi(psi, x, areas, Vs, projection='2d', save=False):
 
                                 return comp,potent#,real,imag
 
-                anim = animation.FuncAnimation(fig,animate,range(len(psi)),init_func=anim_init,interval=0.01,blit=False)
+                anim = animation.FuncAnimation(fig,animate,range(len(psi)),init_func=anim_init,interval=100,blit=False)
                 plt.show()
                 if save:
-                        anim.save(str("3DTDSE_"+str(V.__name__)+'.mp4'),fps=60)
+                        anim.save(str("3DTDSE_"+str(V.__name__)+'.mp4'),fps=30)
 
         makeAnimation(psi, x, areas, projection, save)
         
@@ -262,8 +262,8 @@ if __name__ == '__main__':
         A =  1# amplitude
         k = 2 # wave number
         sig = 1 # width of wave packet
-        p0 = -4
-        E = p0**2/2
+        k0 = -4
+        E = k0**2/2   #E = P^2/(2m) -> k = P/hbar , hbar = 1, m = 1 -> E = k^2/2 
         x0 = 0
 
         V=sho
@@ -275,23 +275,11 @@ if __name__ == '__main__':
 
         vals, vects = find_eigs(sparsify(H))
         E = sorted(vals)[0]
-        p0 = np.sqrt(2*E)
+        k0 = np.sqrt(2*E)
 
-        psi = initPsi(x,x0,A,p0,sig)
+        psi = initPsi(x,x0,A,k0,sig)
 
         
-
-##        fig = plt.figure()
-##        ax = plt.axes(xlim=(-L/2,L/2),ylim=(-A,A))
-##        real, = ax.plot(x,[],lw=2,color='b',label='Real Part')
-##        imag, = ax.plot([],[],lw=2,color='r',label='Imaginary Part')
-##        abso, = ax.plot([],[],lw=2,color='k',label='Absolute Value')
-##        potent = enax.fill_between(x,Vs,color='0.6',label='V(x)', alpha=0.2)
-##        eLevel = enax.hlines(E,-plotL/2,plotL/2,color='0.6',label='E', linestyle='dashed')
-##
-##        area = ax.text(0.1,0.9,'',transform=ax.transAxes, ha='left',va='top',fontsize=15)
-##        fig.legend(*(np.append(ax.get_legend_handles_labels(),enax.get_legend_handles_labels(),axis=1)))
-
 
 
 
@@ -303,18 +291,5 @@ if __name__ == '__main__':
         for i in range(0, nt):
             areas.append(likelihood(norm_psi, i, -L/2, L/2))
 
-##
-##        fig = plt.figure(1)
-##        plt.plot(x,np.absolute(psi[0]),color='k',label='Absolute Value')
-##        plt.plot(x,np.real(psi[0]),color='b',label='Real Part')
-##        plt.plot(x,np.imag(psi[0]),color='r',label='Imaginary Part')
-##        plt.plot(x,U,color='0.8',label='Potential')
-##        plt.xlim([-L/2,L/2])
-##        plt.ylim(-A,A)
-##        plt.title("Initial Condition")
-##        plt.legend()
+
         animatePsi(psi, x, areas, Vs, projection='2d', save=True)
-##        anim = animation.FuncAnimation(fig,animate,frames=psi,interval=1, blit=True)
-
-##        plt.show()
-
