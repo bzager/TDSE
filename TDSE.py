@@ -17,11 +17,11 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 import time
 
 # constants
-L = 100.0 # length of domain [-L/2, L/2]
+L = 2.0 # length of domain [-L/2, L/2]
 plotL = L/2
-T = 10 # total time
+T = .01 # total time
 
-nx = 1000 # spatial grid size
+nx = 400 # spatial grid size
 nt = 1000 # time grid size
 ##dx = 0.01
 ##dt = 0.01
@@ -65,7 +65,7 @@ def triangle(x,x0=0,h=1,w=0):
         return h*np.abs(x)
 
 def Vcomplex(x,x0=0,h=1,w=0):
-        U = [h if ((i<x0-w/2) or (i>x0+w/2)) else i*1j/10 for i in x]
+        U = [h if ((i<x0-w/2) or (i>x0+w/2)) else i*1j/1 for i in x]
         return U
 
 # returns ith diagonal element of Hamiltonian matrix 
@@ -101,15 +101,15 @@ def sparsify(M):
 # initializes psi with initial condition
 # and zeros for the rest 
 # row n is solution on whole domain at time n
-def initPsi(x,x0,A,k0,sig):
+def initPsi(x,x0,k0,sig):
         psi = np.zeros([nt,nx],dtype=np.complex)
         psi[0] = packet(x,x0,A,k0,sig)
 
         return psi
 
-def packet(x,x0,A,k0,sig):
-        return A*np.exp(-(x-x0)**2/(2*sig**2) - k0*x*1j)
-##      return A*np.exp(k0*(x-x0)*1j)*np.exp(-(x-x0)**2/(4*sig**2))
+def packet(x,x0,k0,sig):
+##        return np.exp(-(x-x0)**2/(2*sig**2) - k0*x*1j)
+      return np.exp(k0*(x-x0)*1j)*np.exp(-(x-x0)**2/(4*sig**2))
 
 def BTCS(A,B,psi):
         for n in range(nt-1):
@@ -146,17 +146,19 @@ def animatePsi(psi, x, areas, Vs, projection='2d', save=False):
 
         if projection=='2d':
                 fig = plt.figure()
-                ax = plt.axes(xlim=(-plotL/2,plotL/2),ylim=(-A,A))
+                ax = plt.add_subplot(111,xlim=(-plotL/2,plotL/2),ylim=(-A,A))
                 real, = ax.plot([],[],lw=2,color='b',label='Real Part')
                 imag, = ax.plot([],[],lw=2,color='r',label='Imaginary Part')
                 abso, = ax.plot([],[],lw=2,color='k',label='Absolute Value')
                 potent = ax.fill_between(x,np.abs(Vs),color='0.6',label='V(x)', alpha=0.2)
                 area = ax.text(0.1,0.9,'',transform=ax.transAxes, ha='left',va='top',fontsize=15)
                 plt.legend()
+                ax.set_xlabel('x')
+                ax.set_ylabel(r'$\psi$')
 
         else:
                 fig = plt.figure()
-                ax = plt.axes(projection='3d')
+                ax = plt.add_subplot(111,projection='3d')
         ##      enax=ax.twinx()
         ##      enax = plt.axes(xlim=(-plotL/2,plotL/2),ylim=(-A,A),projection='3d')
 
@@ -168,6 +170,9 @@ def animatePsi(psi, x, areas, Vs, projection='2d', save=False):
                 ax.set_xlim([-plotL/2,plotL/2])
                 ax.set_ylim([-A,A])
                 ax.set_zlim([-A,A])
+                ax.set_xlabel('x')
+                ax.set_ylabel(r'$\Re$')
+                ax.set_zlabel(r'$\Im$')
 
 
                 # Create cubic bounding box to simulate equal aspect ratio - Shamelessly stolen from:
@@ -201,6 +206,10 @@ def animatePsi(psi, x, areas, Vs, projection='2d', save=False):
                                 imag.set_data(x,np.imag(y))
                                 imag.set_3d_properties(0)
 
+                                abso.set_data(x,0)
+                                abso.set_3d_properties(np.absolute(y))
+
+
                                 comp.set_data(x,np.imag(y))
                                 comp.set_3d_properties(np.real(y))
                                 return comp,potent#,real,imag
@@ -223,7 +232,7 @@ def animatePsi(psi, x, areas, Vs, projection='2d', save=False):
 
                                 return comp,potent#,real,imag
 
-                anim = animation.FuncAnimation(fig,animate,range(len(psi)),init_func=anim_init,interval=100,blit=False)
+                anim = animation.FuncAnimation(fig,animate,range(len(psi)),init_func=anim_init,interval=10,blit=False)
                 plt.show()
                 if save:
                         anim.save(str("3DTDSE_"+str(V.__name__)+'.mp4'),fps=30)
@@ -253,31 +262,68 @@ def normalizer(psi):
         tot_integ = likelihood(psi, 0, -L/2, L/2)
         return psi/np.sqrt(tot_integ)
 
+def setup_params():
 
+        psi = packet(x,x0,k0,sig)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.subplots_adjust(left=0.25, bottom=0.25, top=0.75)
+        
+        ax_x = fig.add_axes([0.25, 0.03, 0.65, 0.03])
+        ax_k = fig.add_axes([0.25, 0.08, 0.65, 0.03])
+        ax_sig = fig.add_axes([0.25, 0.13, 0.65, 0.03])
+
+        ax_vx = fig.add_axes([0.25, 0.8, 0.65, 0.03])
+        ax_vw = fig.add_axes([0.25, 0.85, 0.65, 0.03])
+        ax_vh = fig.add_axes([0.25, 0.9, 0.65, 0.03])
+
+        sl_x = Slider(ax_x, 'Position', -L/2, L/2, valinit=x0)
+        sl_x = Slider(ax_k, 'Wavenumber', -100, 100, valinit=k0)
+        sl_x = Slider(ax_x, 'Position', -L/2, L/2, valinit=x0)
+
+        sl_x = Slider(ax_x, 'Position', -L/2, L/2, valinit=x0)
+        sl_x = Slider(ax_x, 'Position', -L/2, L/2, valinit=x0)
+        sl_x = Slider(ax_x, 'Position', -L/2, L/2, valinit=x0)
+
+
+
+
+        
+        plt.show()
+        
+        
 
 
 
 if __name__ == '__main__':
+
         
-        A =  1# amplitude
         k = 2 # wave number
-        sig = 1 # width of wave packet
-        k0 = -4
+        sig = 0.01 # width of wave packet
+        k0 = 50
         E = k0**2/2   #E = P^2/(2m) -> k = P/hbar , hbar = 1, m = 1 -> E = k^2/2 
         x0 = 0
 
-        V=sho
-        Vargs = [0,1,1] # x0, h, w
+        V=well
+        Vargs = [0,100000,0.5] # x0, h, w
+
+
+##        setup_params()
+
+
+
+
+        
         Vs = np.array(V(x, *Vargs),dtype=np.complex)
 
 
         H = constructH(Vs)
 
-        vals, vects = find_eigs(sparsify(H))
-        E = sorted(vals)[0]
-        k0 = np.sqrt(2*E)
+##        vals, vects = find_eigs(sparsify(H))
+##        E = sorted(vals)[0]
+##        k0 = np.sqrt(2*E)
 
-        psi = initPsi(x,x0,A,k0,sig)
+        psi = initPsi(x,x0,k0,sig)
 
         
 
